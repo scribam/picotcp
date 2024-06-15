@@ -82,9 +82,12 @@ START_TEST(tc_pico_mld_check_hopbyhop)
 END_TEST
 START_TEST(tc_pico_mld_v1querier_expired)
 {
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
+
     struct mld_timer *t = PICO_ZALLOC(sizeof(struct mld_timer));
     struct pico_ip6 addr = {{0}};
-    struct pico_device *dev = pico_null_create("dummy2");
+    struct pico_device *dev = pico_null_create(S, "dummy2");
     struct pico_frame *f = pico_frame_alloc(sizeof(struct pico_frame));
     t->f = f;
     pico_string_to_ipv6("AAAA::109", addr.addr);
@@ -98,8 +101,11 @@ START_TEST(tc_pico_mld_v1querier_expired)
 END_TEST
 START_TEST(tc_pico_mld_send_report)
 {
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
+
     struct pico_frame *f;
-    struct pico_device *dev = pico_null_create("dummy1");
+    struct pico_device *dev = pico_null_create(S, "dummy1");
     struct pico_ip6 addr;
     struct pico_ipv6_link *link;
     struct mcast_parameters p;
@@ -203,8 +209,11 @@ START_TEST(tc_pico_mld_send_done)
 END_TEST
 START_TEST(tc_mld_stsdifs)
 {
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
+
     struct mcast_parameters *p;
-    struct pico_device *dev = pico_null_create("dummy3");
+    struct pico_device *dev = pico_null_create(S, "dummy3");
     struct pico_ipv6_link *link;
     struct mld_timer *t = PICO_ZALLOC(sizeof(struct mld_timer));
     /* Building example frame */
@@ -241,8 +250,11 @@ END_TEST
 
 START_TEST(tc_mld_srst)
 {
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
+
     struct mcast_parameters *p;
-    struct pico_device *dev = pico_null_create("dummy3");
+    struct pico_device *dev = pico_null_create(S, "dummy3");
     struct pico_ipv6_link *link;
     struct pico_mcast_group g;
     /* Building example frame */
@@ -273,8 +285,11 @@ START_TEST(tc_mld_srst)
 END_TEST
 START_TEST(tc_mld_mrsrrt)
 {
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
+
     struct mcast_parameters *p;
-    struct pico_device *dev = pico_null_create("dummy3");
+    struct pico_device *dev = pico_null_create(S, "dummy3");
     struct pico_ipv6_link *link;
     /* Building example frame */
     p = PICO_ZALLOC(sizeof(struct mcast_parameters));
@@ -294,8 +309,11 @@ START_TEST(tc_mld_mrsrrt)
 END_TEST
 START_TEST(tc_pico_mld_process_in)
 {
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
+
     struct mcast_parameters *p;
-    struct pico_device *dev = pico_null_create("dummy3");
+    struct pico_device *dev = pico_null_create(S, "dummy3");
     struct pico_ipv6_link *link;
     uint8_t i, j, _i, _j;
     int result = 0;
@@ -389,8 +407,13 @@ END_TEST
 START_TEST(tc_pico_mld_compatibility_mode)
 {
     struct pico_frame *f;
-    struct pico_device *dev = pico_null_create("dummy1");
+    struct pico_device *dev;
     struct pico_ip6 addr;
+    struct pico_stack *S;
+
+    pico_stack_init(&S);
+
+    dev = pico_null_create(S, "dummy1");
 
     f = pico_proto_ipv6.alloc(&pico_proto_ipv6, NULL, sizeof(struct mldv2_report) + MLD_ROUTER_ALERT_LEN + sizeof(struct mldv2_group_record) + (0 * sizeof(struct pico_ip6)));
     pico_string_to_ipv6("AAAA::104", addr.addr);
@@ -445,12 +468,18 @@ END_TEST
 START_TEST(tc_pico_mld_analyse_packet)
 {
     struct pico_frame *f;
-    struct pico_device *dev = pico_null_create("dummy0");
+    struct pico_device *dev;
     struct pico_ip6 addr;
     struct pico_ip6 local;
     struct pico_ipv6_hdr *ip6;
     struct pico_ipv6_hbhoption *hbh;
     struct pico_icmp6_hdr *mld;
+    struct pico_stack *S;
+
+    pico_stack_init(&S);
+
+    dev = pico_null_create(S, "dummy0");
+
     f = pico_proto_ipv6.alloc(&pico_proto_ipv6, dev, sizeof(struct mld_message) + MLD_ROUTER_ALERT_LEN);
     pico_string_to_ipv6("AAAA::108", addr.addr);
     pico_string_to_ipv6("FE80::1", local.addr);

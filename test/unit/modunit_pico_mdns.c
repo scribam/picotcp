@@ -32,6 +32,7 @@ void callback( pico_mdns_rtree *tree,
 int mdns_init() /* MARK: Initialise mDNS module */
 {
     struct mock_device *mock = NULL;
+    struct pico_stack *S = NULL;
 
     struct pico_ip4 local = {
         .addr = long_be(0x0a280064)
@@ -40,12 +41,14 @@ int mdns_init() /* MARK: Initialise mDNS module */
         .addr = long_be(0xffffff00)
     };
 
-    mock = pico_mock_create(NULL);
+    pico_stack_init(&S);
+
+    mock = pico_mock_create(S, NULL);
     if (!mock) {
         return -1;
     }
 
-    pico_ipv4_link_add(mock->dev, local, netmask);
+    pico_ipv4_link_add(S, mock->dev, local, netmask);
 
     /* Try to initialise the mDNS module right */
     return pico_mdns_init("host.local", local, callback, NULL);
@@ -70,7 +73,8 @@ START_TEST(tc_mdns_init) /* MARK: mdns_init */
 
     printf("*********************** starting %s * \n", __func__);
 
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
 
     /* Try to initialise the mDNS module wrong */
     ret = pico_mdns_init(NULL, local, callback, NULL);
@@ -529,7 +533,8 @@ START_TEST(tc_mdns_cookie_apply_spt) /* MARK: mdns_cookie_apply_spt */
     a.type = PICO_MDNS_PACKET_TYPE_PROBE;
 
     /* Need to initialise the stack to allow timer scheduling IMPORTANT! */
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
 
     /* Create 2 exactly the same cookies */
     pico_tree_insert(&(a.antree), &record1);
@@ -771,7 +776,8 @@ START_TEST(tc_mdns_cookie_resolve_conflict) /* MARK: mdns_cookie_resolve_conflic
                                 callback, NULL);
 
     /* Need to initialise the stack to allow timer scheduling IMPORTANT! */
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
     ret = mdns_init();
     fail_unless(0 == ret, "mdns_init failed!\n");
 
@@ -855,7 +861,8 @@ START_TEST(tc_mdns_record_resolve_conflict) /* MARK: mdns_record_resolve_conflic
                                      PICO_MDNS_RECORD_UNIQUE);
     fail_if(!(record->record), "Record could not be created!\n");
     /* Need to initialise the stack to allow timer scheduling IMPORTANT! */
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
 
     ret = mdns_init();
     fail_unless(0 == ret, "mdns_init failed!\n");
@@ -1768,7 +1775,8 @@ START_TEST(tc_mdns_send_query_packet) /* MARK: send_query_packet */
     pico_tree_insert(&(a.qtree), question2);
     cookie.count = 2;
 
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
     mdns_init();
 
     pico_mdns_send_query_packet(0, &cookie);
@@ -1806,7 +1814,8 @@ START_TEST(tc_mdns_getrecord) /* MARK: getrecord */
      */
 
     /* Init */
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
     mdns_init();
 
 #if PICO_MDNS_ALLOW_CACHING == 1
@@ -1847,7 +1856,8 @@ START_TEST(tc_mdns_send_announcement_packet) /* MARK: send_announcement_packet *
                                      PICO_MDNS_PACKET_TYPE_ANNOUNCEMENT,
                                      callback, NULL);
 
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
     mdns_init();
 
     pico_mdns_send_announcement_packet(0, cookie);
@@ -1857,9 +1867,11 @@ START_TEST(tc_mdns_send_announcement_packet) /* MARK: send_announcement_packet *
 END_TEST
 START_TEST(tc_mdns_announce) /* MARK: annonce */
 {
+    struct pico_stack *S = NULL;
+
     printf("*********************** starting %s * \n", __func__);
     add_records();
-    pico_stack_init();
+    pico_stack_init(&S);
     mdns_init();
 
     fail_unless(0 == pico_mdns_announce(callback, NULL),
@@ -1871,6 +1883,8 @@ END_TEST
 START_TEST(tc_mdns_send_probe_packet) /* MARK: send_probe_packet */
 {
     struct pico_mdns_cookie *cookie = NULL;
+    struct pico_stack *S = NULL;
+
     PICO_DNS_QTREE_DECLARE(qtree);
     PICO_MDNS_RTREE_DECLARE(antree);
     PICO_MDNS_RTREE_DECLARE(artree);
@@ -1881,7 +1895,7 @@ START_TEST(tc_mdns_send_probe_packet) /* MARK: send_probe_packet */
                                      PICO_MDNS_PACKET_TYPE_PROBE,
                                      callback, NULL);
 
-    pico_stack_init();
+    pico_stack_init(&S);
     mdns_init();
 
     pico_mdns_send_probe_packet(0, cookie);
@@ -1928,9 +1942,11 @@ START_TEST(tc_mdns_add_probe_question) /* MARK: add_probe_question */
 END_TEST
 START_TEST(tc_mdns_probe) /* MARK: probe */
 {
+    struct pico_stack *S = NULL;
+
     printf("*********************** starting %s * \n", __func__);
     add_records();
-    pico_stack_init();
+    pico_stack_init(&S);
     mdns_init();
 
     fail_unless(0 == pico_mdns_probe(callback, NULL),
@@ -1943,6 +1959,7 @@ START_TEST(tc_mdns_claim) /* MARK: mdns_claim */
 {
     PICO_MDNS_RTREE_DECLARE(rtree);
     struct pico_mdns_record *record = NULL, *record1 = NULL;
+    struct pico_stack *S = NULL;
     char url[] = "foo.local";
     char url2[] = "bar.local";
     struct pico_ip4 rdata = {
@@ -1963,7 +1980,7 @@ START_TEST(tc_mdns_claim) /* MARK: mdns_claim */
     pico_tree_insert(&rtree, record);
     pico_tree_insert(&rtree, record1);
 
-    pico_stack_init();
+    pico_stack_init(&S);
     mdns_init();
 
     ret = pico_mdns_claim(rtree, callback, NULL);
@@ -1974,10 +1991,11 @@ START_TEST(tc_mdns_claim) /* MARK: mdns_claim */
 END_TEST
 START_TEST(tc_mdns_tryclaim_hostname) /* MARK: tryclaim_hostname */
 {
+    struct pico_stack *S = NULL;
     int ret = 0;
 
     printf("*********************** starting %s * \n", __func__);
-    pico_stack_init();
+    pico_stack_init(&S);
     mdns_init();
 
     ret = pico_mdns_tryclaim_hostname("test.local", NULL);
@@ -1989,8 +2007,10 @@ END_TEST
 START_TEST(tc_mdns_get_hostname) /* MARK: get_hostname */
 {
     const char *c_hostname;
+    struct pico_stack *S = NULL;
+
     printf("*********************** starting %s * \n", __func__);
-    pico_stack_init();
+    pico_stack_init(&S);
     mdns_init();
 
     c_hostname = pico_mdns_get_hostname();

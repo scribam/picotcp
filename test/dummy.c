@@ -6,7 +6,8 @@ volatile uint32_t pico_ms_tick;
 
 int main(void)
 {
-    pico_stack_init();
-    pico_stack_tick();
+    struct pico_stack *stack = NULL;
+    pico_stack_init(&stack);
+    pico_stack_tick(stack);
     return 0;
 }

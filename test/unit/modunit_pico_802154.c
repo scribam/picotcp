@@ -436,7 +436,8 @@ START_TEST(tc_802154_process_out)
     dev.hostvars.lowpan_flags = PICO_6LP_FLAG_LOWPAN;
 
     STARTING();
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
 
     // TEST 1
     TRYING("Trying with bare frame\n");
@@ -484,7 +485,8 @@ START_TEST(tc_802154_process_in)
     f->dst.pan = dst;
 
     STARTING();
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
 
     TRYING("Apply processing function on predefined buffer\n");
     ret = pico_802154_process_in(f);

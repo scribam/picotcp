@@ -29,6 +29,13 @@
 
 #include "pico_config.h"
 
+/* This is used in unit tests to declare a new tree, leaf root by default */
+#define PICO_TREE_DECLARE(name, compareFunction) \
+    struct pico_tree name = \
+    { \
+        &LEAF, \
+        compareFunction \
+    }
 
 #define USE_PICO_PAGE0_ZALLOC (1)
 #define USE_PICO_ZALLOC (2)
