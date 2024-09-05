@@ -98,7 +98,7 @@ END_TEST
 
 START_TEST (test_tick)
 {
-    pico_tick = (uint64_t)-1;
+    pico_time pico_tick = (uint64_t)-1;
     fail_if(pico_tick != 0xFFFFFFFFFFFFFFFF, "Failed to assign (uint64_t)-1 to pico_tick\n");
 }
 END_TEST

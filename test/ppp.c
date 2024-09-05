@@ -124,20 +124,21 @@ static void cb_sock(uint16_t ev, struct pico_socket *s)
 
 }
 
-static void ping(void)
+static void ping(struct pico_stack *stack)
 {
     struct pico_socket *s;
     struct pico_ip4 dst;
 
     pico_string_to_ipv4("80.68.95.85", &dst.addr);
-    s = pico_socket_open(PICO_PROTO_IPV4, PICO_PROTO_TCP, cb_sock);
+    s = pico_socket_open(stack, PICO_PROTO_IPV4, PICO_PROTO_TCP, cb_sock);
     pico_socket_connect(s, &dst, short_be(80));
-    pico_icmp4_ping("80.68.95.85", 10, 1000, 4000, 8, cb_ping);
+    pico_icmp4_ping(stack, "80.68.95.85", 10, 1000, 4000, 8, cb_ping);
 }
 
 
 int main(int argc, const char *argv[])
 {
+    struct pico_stack *stack = NULL;
     const char *path = MODEM;
     const char *apn = APN;
     const char *passwd = PASSWD;
@@ -162,7 +163,7 @@ int main(int argc, const char *argv[])
     signal(SIGUSR2, sigusr2_hdl);
     signal(SIGINT, sigusr2_hdl);
 
-    pico_stack_init();
+    pico_stack_init(&stack);
 
 #if defined PICO_SUPPORT_POLARSSL || defined PICO_SUPPORT_CYASSL
     pico_register_md5sum(md5sum);
@@ -183,11 +184,11 @@ int main(int argc, const char *argv[])
     pico_ppp_connect(ppp);
 
     while(1 < 2) {
-        pico_stack_tick();
+        pico_stack_tick(stack);
         usleep(1000);
         if (ppp->link_state(ppp) && !ping_on) {
             ping_on++;
-            ping();
+            ping(stack);
         }
     }
 }

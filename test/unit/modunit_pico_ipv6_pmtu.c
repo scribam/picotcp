@@ -516,7 +516,8 @@ START_TEST(pico_ipv6_path_cache)
 	struct pico_ipv6_path_id path_id = {{{
                                              0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x50, 0x56, 0xff, 0xfe, 0x87, 0x06, 0xb6
                                          }}};
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
     /* Timer should be allocated */
     fail_if(gc_timer.id == 0);
     /* Adding new paths should be OK */
@@ -529,34 +530,34 @@ START_TEST(pico_ipv6_path_cache)
         path_id.dst.addr[10] = i;
         fail_if(pico_ipv6_pmtu_get(&path_id) != default_mtu + i);
     }
-    pico_stack_tick(); /* No changes: cleanup only in (default) 10 minutes */
+    pico_stack_tick(S); /* No changes: cleanup only in (default) 10 minutes */
     pico_ipv6_path_init(5 * 1000);
-    pico_stack_tick(); /* Cleanup in 5s: all paths valid */
+    pico_stack_tick(S); /* Cleanup in 5s: all paths valid */
     for (i = 0; i < 0xff; i++) {
         path_id.dst.addr[10] = i;
         fail_if(pico_ipv6_pmtu_get(&path_id) != default_mtu + i);
     }
     sleep(6);
-    pico_stack_tick(); /* Paths marked as old */
+    pico_stack_tick(S); /* Paths marked as old */
     fail_if(gc_timer.id == 0);
     path_id.dst.addr[10] = 0xfe;
     fail_if(pico_ipv6_path_update(&path_id, default_mtu) != PICO_PMTU_OK);
     sleep(6);
-    pico_stack_tick(); /* Updated path available other paths are deleted */
+    pico_stack_tick(S); /* Updated path available other paths are deleted */
     fail_if(pico_ipv6_pmtu_get(&path_id) != default_mtu);
     for (i = 0; i < 0xfe; i++) {
         path_id.dst.addr[10] = i;
         fail_if(pico_ipv6_pmtu_get(&path_id) != 0);
     }
     sleep(6);
-    pico_stack_tick(); /* Path cache expired */
+    pico_stack_tick(S); /* Path cache expired */
     fail_if(gc_timer.id == 0);
     for (i = 0; i < 0xff; i++) {
         path_id.dst.addr[10] = i;
         fail_if(pico_ipv6_pmtu_get(&path_id) != 0);
     }
     sleep(8);
-    pico_stack_tick(); /* Cleanup empty cache */
+    pico_stack_tick(S); /* Cleanup empty cache */
     fail_if(gc_timer.id == 0);
 }
 END_TEST
