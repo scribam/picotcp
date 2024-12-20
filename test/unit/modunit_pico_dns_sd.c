@@ -40,6 +40,7 @@ void callback( pico_mdns_rtree *tree,
 int dns_sd_init()
 {
     struct mock_device *mock = NULL;
+    struct pico_stack *S = NULL;
 
     struct pico_ip4 local = {
         .addr = long_be(0x0a280064)
@@ -48,11 +49,13 @@ int dns_sd_init()
         .addr = long_be(0xffffff00)
     };
 
-    mock = pico_mock_create(NULL);
+    pico_stack_init(&S);
+
+    mock = pico_mock_create(S, NULL);
     if (!mock)
         return -1;
 
-    pico_ipv4_link_add(mock->dev, local, netmask);
+    pico_ipv4_link_add(S, mock->dev, local, netmask);
 
     /* Try to initialise the mDNS module right */
     return pico_dns_sd_init("host.local", local, callback, NULL);
@@ -248,14 +251,16 @@ START_TEST(tc_dns_sd_create_service_url)
 END_TEST
 START_TEST(tc_dns_sd_init)
 {
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
     fail_unless(dns_sd_init() == 0,
                 "dns_sd_init failed!\n");
 }
 END_TEST
 START_TEST(tc_dns_sd_register_service)
 {
-    pico_stack_init();
+    struct pico_stack *S = NULL;
+    pico_stack_init(&S);
     dns_sd_init();
 }
 END_TEST

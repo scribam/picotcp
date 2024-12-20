@@ -1,8 +1,10 @@
+#include "pico_stack.h"
+
 #define BUFLEN (576 + 14 + 20 + 8)
 
 int mock_print_protocol(uint8_t *buf);
 int printbuf(uint8_t *buf, uint32_t len, const char *str, uint8_t printbufactive);
-int tick_it(uint32_t nticks);
+int tick_it(struct pico_stack *S, uint32_t nticks);
 
 int mock_print_protocol(uint8_t *buf)
 {
@@ -61,11 +63,11 @@ int printbuf(uint8_t *buf, uint32_t len, const char *str, uint8_t printbufactive
 #define DHCP_MSG_TYPE_OFFER    (2)
 #define DHCP_MSG_TYPE_REQUEST  (3)
 #define DHCP_MSG_TYPE_ACK      (4)
-int tick_it(uint32_t nticks)
+int tick_it(struct pico_stack *S, uint32_t nticks)
 {
     uint32_t i = 0;
     for (i = 0; i < nticks; i++) {
-        pico_stack_tick();
+        pico_stack_tick(S);
     }
     return 0;
 }

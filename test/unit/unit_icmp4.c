@@ -35,6 +35,7 @@ START_TEST (test_icmp4_ping)
         0
     };
     struct mock_device *mock = NULL;
+    struct pico_stack *S = NULL;
     char local_address[] = {
         "192.168.1.102"
     };
@@ -49,6 +50,7 @@ START_TEST (test_icmp4_ping)
     uint8_t buffer[bufferlen];
     int len;
     uint8_t temp_buf[4];
+
     printf("*********************** starting %s * \n", __func__);
 
     pico_string_to_ipv4(local_address, &(local.addr));
@@ -57,24 +59,24 @@ START_TEST (test_icmp4_ping)
     pico_string_to_ipv4(remote_address, &(remote.addr));
     pico_string_to_ipv4("255.255.255.0", &(netmask.addr));
 
-    pico_stack_init();
+    pico_stack_init(&S);
 
-    mock = pico_mock_create(NULL);
+    mock = pico_mock_create(S, NULL);
     fail_if(mock == NULL, "No device created");
 
-    pico_ipv4_link_add(mock->dev, local, netmask);
+    pico_ipv4_link_add(S, mock->dev, local, netmask);
 
-    fail_if(pico_icmp4_ping(local_address, NUM_PING, interval, timeout, size, cb_ping) < 0);
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    fail_if(pico_icmp4_ping(S, local_address, NUM_PING, interval, timeout, size, cb_ping) < 0);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
 
     fail_if(ping_test_var != 1);
 
-    pico_icmp4_ping(remote_address, NUM_PING, interval, timeout, size, cb_ping);
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    pico_icmp4_ping(S, remote_address, NUM_PING, interval, timeout, size, cb_ping);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
 
     /* get the packet from the mock_device */
     memset(buffer, 0, (size_t)bufferlen);
@@ -95,17 +97,17 @@ START_TEST (test_icmp4_ping)
     /* using the mock-device because otherwise I have to put everything in a pico_frame correctly myself. */
     pico_mock_network_write(mock, buffer, len);
     /* check if it is received */
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
     fail_unless(ping_test_var == 2);
 
     /* repeat but make it an invalid reply... */
 
-    pico_icmp4_ping(remote_address, NUM_PING, interval, timeout, size, cb_ping);
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    pico_icmp4_ping(S, remote_address, NUM_PING, interval, timeout, size, cb_ping);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
 
     /* get the packet from the mock_device */
     memset(buffer, 0, (size_t)bufferlen);
@@ -126,9 +128,9 @@ START_TEST (test_icmp4_ping)
     /* using the mock-device because otherwise I have to put everything in a pico_frame correctly myself. */
     pico_mock_network_write(mock, buffer, len);
     /* check if it is received */
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
     fail_unless(ping_test_var == 2);
 }
 END_TEST
@@ -168,27 +170,29 @@ START_TEST (test_icmp4_incoming_ping)
     struct pico_ip4 netmask = {
         .addr = long_be(0xffffff00)
     };
-    struct mock_device*mock;
+    struct mock_device *mock;
     struct pico_ipv4_hdr *hdr = (struct pico_ipv4_hdr *) buffer;
+    struct pico_stack *S = NULL;
+
     printf("*********************** starting %s * \n", __func__);
 
-    pico_stack_init();
+    pico_stack_init(&S);
 
-    mock = pico_mock_create(NULL);
+    mock = pico_mock_create(S, NULL);
     fail_if(mock == NULL, "No device created");
 
-    pico_ipv4_link_add(mock->dev, local, netmask);
+    pico_ipv4_link_add(S, mock->dev, local, netmask);
 
     hdr->crc = 0;
     hdr->crc = short_be(pico_checksum(hdr, PICO_SIZE_IP4HDR));
     pico_mock_network_write(mock, buffer, bufferlen);
     /* check if it is received */
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
 
 
     len = pico_mock_network_read(mock, buffer2, buffer2len);
@@ -236,24 +240,26 @@ START_TEST (test_icmp4_unreachable_send)
         0x0a, 0x28, 0x00, 0x04
     };
 
-    struct pico_frame*f = PICO_ZALLOC(sizeof(struct pico_frame));
+    struct pico_frame *f = PICO_ZALLOC(sizeof(struct pico_frame));
+    struct pico_stack *S = NULL;
+
     printf("*********************** starting %s * \n", __func__);
 
     f->net_hdr = buffer;
     f->buffer = buffer;
 
-    pico_stack_init();
+    pico_stack_init(&S);
 
-    mock = pico_mock_create(NULL);
+    mock = pico_mock_create(S, NULL);
     fail_if(mock == NULL, "No device created");
 
-    pico_ipv4_link_add(mock->dev, local, netmask);
+    pico_ipv4_link_add(S, mock->dev, local, netmask);
 
 
-    fail_if(pico_icmp4_dest_unreachable(f));
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    fail_if(pico_icmp4_dest_unreachable(S, f));
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
 
     len = pico_mock_network_read(mock, buffer2, bufferlen);
 
@@ -264,10 +270,10 @@ START_TEST (test_icmp4_unreachable_send)
     fail_unless(pico_checksum(buffer2 + 20, (uint32_t)(len - 20)) == 0);
 
 
-    fail_if(pico_icmp4_port_unreachable(f));
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    fail_if(pico_icmp4_port_unreachable(S, f));
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
 
     len = pico_mock_network_read(mock, buffer2, bufferlen);
 
@@ -278,10 +284,10 @@ START_TEST (test_icmp4_unreachable_send)
     fail_unless(pico_checksum(buffer2 + 20, (uint32_t)(len - 20)) == 0);
 
 
-    fail_if(pico_icmp4_proto_unreachable(f));
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    fail_if(pico_icmp4_proto_unreachable(S, f));
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
 
     len = pico_mock_network_read(mock, buffer2, bufferlen);
 
@@ -292,10 +298,10 @@ START_TEST (test_icmp4_unreachable_send)
     fail_unless(pico_checksum(buffer2 + 20, (uint32_t)(len - 20)) == 0);
 
 
-    fail_if(pico_icmp4_ttl_expired(f));
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    fail_if(pico_icmp4_ttl_expired(S, f));
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
 
     len = pico_mock_network_read(mock, buffer2, bufferlen);
 
@@ -308,10 +314,10 @@ START_TEST (test_icmp4_unreachable_send)
     f->net_hdr = buffer3;
     f->buffer = buffer3;
 
-    fail_if(pico_icmp4_proto_unreachable(f));
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    fail_if(pico_icmp4_proto_unreachable(S, f));
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
 
     len = pico_mock_network_read(mock, buffer2, bufferlen);
 
@@ -344,8 +350,8 @@ START_TEST (test_icmp4_unreachable_recv)
     struct pico_ip4 netmask = {
         .addr = long_be(0xffffff00)
     };
-    struct mock_device*mock;
-    struct pico_socket*sock;
+    struct mock_device *mock;
+    struct pico_socket *sock;
     uint16_t port = short_be(7777);
 
     /* put a host unreachable in the queue, run a few stack ticks */
@@ -367,35 +373,37 @@ START_TEST (test_icmp4_unreachable_recv)
         0x00, 0x00, 0x00, 0x00,
     };
     struct pico_ipv4_hdr *hdr = (struct pico_ipv4_hdr *) buffer;
+    struct pico_stack *S = NULL;
 
     printf("*********************** starting %s * \n", __func__);
-    pico_stack_init();
 
-    mock = pico_mock_create(NULL);
+    pico_stack_init(&S);
+
+    mock = pico_mock_create(S, NULL);
     fail_if(mock == NULL, "No device created");
 
-    pico_ipv4_link_add(mock->dev, local, netmask);
+    pico_ipv4_link_add(S, mock->dev, local, netmask);
 
     /* open a socket */
-    sock = pico_socket_open(PICO_PROTO_IPV4, PICO_PROTO_TCP, &icmp4_unreach_socket_cb);
+    sock = pico_socket_open(S, PICO_PROTO_IPV4, PICO_PROTO_TCP, &icmp4_unreach_socket_cb);
     fail_if(sock == NULL);
     fail_if(pico_socket_bind(sock, &local, &port));
     pico_socket_connect(sock, &remote, port);
     pico_socket_write(sock, "fooo", 4);
     /* see if my callback was called with the proper code */
 
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
     /* filling in the IP header and first 8 bytes */
     hdr->crc = 0;
     hdr->crc = short_be(pico_checksum(hdr, PICO_SIZE_IP4HDR));
     printf("read %d bytes\n", pico_mock_network_read(mock, buffer + 28, 28));
 
     printf("wrote %d bytes\n", pico_mock_network_write(mock, buffer, 56));
-    pico_stack_tick();
-    pico_stack_tick();
-    pico_stack_tick();
+    pico_stack_tick(S);
+    pico_stack_tick(S);
+    pico_stack_tick(S);
     fail_unless(icmp4_socket_unreach_status == 1);
 }
 END_TEST

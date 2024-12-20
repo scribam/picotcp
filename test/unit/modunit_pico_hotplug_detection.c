@@ -71,8 +71,12 @@ START_TEST(tc_pico_hotplug_reg_dereg)
 {
     /* create some devices */
     struct pico_device *dev_a, *dev_b;
-    dev_a = pico_null_create("dummy1");
-    dev_b = pico_null_create("dummy2");
+    struct pico_stack *S;
+
+    pico_stack_init(&S);
+
+    dev_a = pico_null_create(S, "dummy1");
+    dev_b = pico_null_create(S, "dummy2");
 
     dev_a->link_state = &link_state_a;
     dev_b->link_state = &link_state_b;
@@ -116,9 +120,12 @@ START_TEST(tc_pico_hotplug_callbacks)
 {
     /* create some devices */
     struct pico_device *dev_a, *dev_b;
+    struct pico_stack *S;
 
-    dev_a = pico_null_create("dummy1");
-    dev_b = pico_null_create("dummy2");
+    pico_stack_init(&S);
+
+    dev_a = pico_null_create(S, "dummy1");
+    dev_b = pico_null_create(S, "dummy2");
 
     dev_a->link_state = &link_state_a;
     dev_b->link_state = &link_state_b;
