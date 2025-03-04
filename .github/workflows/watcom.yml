@@ -1,0 +1,13 @@
+name: OpenWatcom
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: open-watcom/setup-watcom@v0
+      - uses: actions/checkout@v4
+      - run: make -f Makefile.watcom WATCOM_PATH=/home/runner/watcom
