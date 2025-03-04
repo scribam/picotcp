@@ -182,7 +182,6 @@ START_TEST(tc_ctx_lookup)
     pico_string_to_ipv6("2aaa:1234:5678:9145:0102:0304:0506:0708", b.addr);
 
     STARTING();
-    pico_stack_init();
 
     TRYING("To find a prefix in the context tree\n");
     ret = ctx_insert(a, 13, 54, 0, PICO_IPHC_CTX_COMPRESS, NULL);
@@ -524,8 +523,6 @@ START_TEST(tc_addr_comp_mode)
 
     STARTING();
 
-    pico_stack_init();
-
     TRYING("With MAC derived address\n");
     ret = addr_comp_mode(iphc, &local2, addr, &dev, SRC_SHIFT);
     OUTPUT();
@@ -570,8 +567,6 @@ START_TEST(tc_addr_comp_prefix)
     pico_string_to_ipv6("2aaa:0:0:0:0:0ff:fe00:0105", local3.addr);
 
     STARTING();
-
-    pico_stack_init();
 
     TRYING("With MCAST address\n");
     ret = addr_comp_prefix(iphc, &ip, 1);
@@ -623,7 +618,6 @@ START_TEST(tc_compressor_src)
 
     dev.mode = LL_MODE_IEEE802154;
     STARTING();
-    pico_stack_init();
 
     TRYING("With unspecified source address, should: set SAC, clear SAM\n");
     ret = compressor_src(unspec.addr, buf, iphc, &mac, NULL, &dev);
@@ -675,7 +669,6 @@ START_TEST(tc_compressor_src)
     FAIL_UNLESS(0 == memcmp(buf, ll_nmac_64.addr + 8, 8), test, "Should've copied IID of source address inline");
 
     TRYING("With context derived address\n");
-    pico_stack_init();
     ctx_insert(ip_ctx, 13, 64, 0, PICO_IPHC_CTX_COMPRESS, NULL);
     ret = compressor_src(ip_ctx.addr, buf, iphc, &mac, NULL, &dev);
     OUTPUT();
@@ -743,7 +736,6 @@ START_TEST(tc_decompressor_src)
     uint8_t buf[PICO_SIZE_IP6] = { 0 };
     dev.mode = LL_MODE_IEEE802154;
 
-    pico_stack_init();
     STARTING();
 
     TRYING("With statelessly compressed address\n");
@@ -756,7 +748,6 @@ START_TEST(tc_decompressor_src)
     memset(buf, 0, PICO_SIZE_IP6);
 
     TRYING("With context\n");
-    pico_stack_init();
     ctx_insert(ip2, 13, 64, 0, PICO_IPHC_CTX_COMPRESS, NULL);
     ret = decompressor_src(buf, buf2, iphc2, &mac, NULL, &dev);
     OUTPUT();
@@ -831,7 +822,6 @@ START_TEST(tc_compressor_dst)
 
     dev.mode = LL_MODE_IEEE802154;
     STARTING();
-    pico_stack_init();
 
     TRYING("48-bit derivable mcast address\n");
     ret = compressor_dst(mcast1.addr, buf, iphc, NULL, &mac, &dev);
@@ -900,7 +890,6 @@ START_TEST(tc_decompressor_dst)
 
     dev.mode = LL_MODE_IEEE802154;
     STARTING();
-    pico_stack_init();
 
     TRYING("48-bit compressed address\n");
     ret = decompressor_dst(buf,buf1,iphc1,NULL, &mac,&dev);
@@ -972,7 +961,6 @@ START_TEST(tc_compressor_iphc)
     f->dst = dst;
 
     STARTING();
-    pico_stack_init();
 
     TRYING("To compress a IPv6 frame from a sample capture\n");
     buf = compressor_iphc(f, &compressed_len, &nh);
@@ -1011,7 +999,6 @@ START_TEST(tc_decompressor_iphc)
     f->dst = dst;
 
     STARTING();
-    pico_stack_init();
 
     TRYING("To decompress a 6LoWPAN frame from a sampel capture\n");
     buf = decompressor_iphc(f, &compressed_len);
@@ -1248,7 +1235,6 @@ START_TEST(tc_pico_iphc_compress)
     f->dst = dst;
 
     STARTING();
-    pico_stack_init();
 
     TRYING("Trying to compress an IPv6 frame from an example capture\n");
     new = pico_iphc_compress(f);
@@ -1282,7 +1268,6 @@ START_TEST(tc_pico_iphc_decompress)
     f->dst = dst;
 
     STARTING();
-    pico_stack_init();
 
     TRYING("Trying to decompress a 6LoWPAN frame from an example capture\n");
     new = pico_iphc_decompress(f);
@@ -1396,6 +1381,7 @@ static char *cpy_arg(char **dst, char *str)
 
 static void app_ping(char *arg)
 {
+    struct pico_stack *S = NULL;
     char *dest = NULL;
     char *next = NULL;
     char *abort = NULL;
@@ -1439,7 +1425,7 @@ static void app_ping(char *arg)
                 printf("Initial delay: %u seconds\n", initial_delay);
                 initial_delay = PICO_TIME_MS() + (initial_delay * 1000);
                 while (PICO_TIME_MS() < initial_delay) {
-                    pico_stack_tick();
+                    pico_stack_tick(S);
                     usleep(10000);
                 }
             }
@@ -1486,9 +1472,6 @@ START_TEST(tc_tx_rx)
     n_area0 = (uint8_t) atoi(area0);
     n_area1 = (uint8_t) atoi(area1);
 
-    /* Initialize picoTCP */
-    pico_stack_init();
-
     pico_string_to_ipv6(pan_addr, myaddr.addr);
     pico_string_to_ipv6(pan_addr, pan.addr);
     pico_string_to_ipv6(pan_netmask, netmask.addr);
@@ -1513,7 +1496,7 @@ START_TEST(tc_tx_rx)
 
     printf("%s: launching PicoTCP loop\n", __FUNCTION__);
     while(!rx) {
-        pico_stack_tick();
+        pico_stack_tick(S);
         usleep(2000);
     }
     OUTPUT();
