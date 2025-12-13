@@ -1656,6 +1656,8 @@ START_TEST(tc_mdns_handle_data_as_answers) /* MARK: handle_data_as_answers */
     fail_if(!a, "dns_record_create returned NULL!\n");
     pico_tree_insert(&rtree, a->record);
     pico_tree_insert(&rtree, b->record);
+    pico_tree_insert(&S->MDNSOwnRecords, a);
+    pico_tree_insert(&S->MDNSOwnRecords, b);
 
     /* Try to create an answer packet */
     packet = pico_dns_answer_create(&rtree, NULL, NULL, &len);
@@ -1696,6 +1698,8 @@ START_TEST(tc_mdns_handle_data_as_authorities) /* MARK: handle_data_as_authoriti
     fail_if(!a, "dns_record_create returned NULL!\n");
     pico_tree_insert(&rtree, a->record);
     pico_tree_insert(&rtree, b->record);
+    pico_tree_insert(&S->MDNSOwnRecords, a);
+    pico_tree_insert(&S->MDNSOwnRecords, b);
 
     /* Try to create an answer packet */
     packet = pico_dns_answer_create(&rtree, NULL, NULL, &len);
