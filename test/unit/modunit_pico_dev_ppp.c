@@ -471,6 +471,7 @@ START_TEST(tc_lcp_send_configure_request)
     LCPOPT_SET_LOCAL((&_ppp), LCPOPT_PROTO_COMP);
     LCPOPT_SET_LOCAL((&_ppp), LCPOPT_MRU);
     LCPOPT_SET_LOCAL((&_ppp), LCPOPT_ADDRCTL_COMP);
+    LCPOPT_SET_LOCAL((&_ppp), LCPOPT_ASYNCMAP); // FIXME
     lcp_send_configure_request(&_ppp);
     fail_if(called_serial_send != 1);
     fail_if(serial_out_len != 32);
@@ -496,7 +497,22 @@ START_TEST(tc_lcp_optflags)
     fail_if(_ppp.auth != 0x5699);
 }
 END_TEST
-
+START_TEST(tc_lcp_optflags_asyncmap)
+{
+    uint8_t pkt[6 + sizeof(struct pico_lcp_hdr)];
+    uint8_t *p = pkt + sizeof(struct pico_lcp_hdr);
+    /* Escape all control characters by default */
+    p[0] = 0x02;
+    p[1] = 0x06;
+    p[2] = 0x12;
+    p[3] = 0x34;
+    p[4] = 0x56;
+    p[5] = 0x78;
+    memset(&_ppp, 0, sizeof(_ppp));
+    fail_if(lcp_optflags(&_ppp, pkt, 4 + sizeof(struct pico_lcp_hdr), 1u) != 0x04);
+    fail_if(_ppp.asyncmap != 0x12345678);
+}
+END_TEST
 START_TEST(tc_lcp_send_configure_ack)
 {
     uint8_t pkt[20] = "";
@@ -1199,6 +1215,7 @@ Suite *pico_suite(void)
     TCase *TCase_ppp_modem_recv = tcase_create("Unit test for ppp_modem_recv");
     TCase *TCase_lcp_send_configure_request = tcase_create("Unit test for lcp_send_configure_request");
     TCase *TCase_lcp_optflags = tcase_create("Unit test for lcp_optflags");
+    TCase *TCase_lcp_optflags_asyncmap = tcase_create("Unit test for lcp_optflags_asyncmap");
     TCase *TCase_lcp_send_configure_ack = tcase_create("Unit test for lcp_send_configure_ack");
     TCase *TCase_lcp_send_terminate_request = tcase_create("Unit test for lcp_send_terminate_request");
     TCase *TCase_lcp_send_terminate_ack = tcase_create("Unit test for lcp_send_terminate_ack");
@@ -1294,6 +1311,8 @@ Suite *pico_suite(void)
     suite_add_tcase(s, TCase_lcp_send_configure_request);
     tcase_add_test(TCase_lcp_optflags, tc_lcp_optflags);
     suite_add_tcase(s, TCase_lcp_optflags);
+    tcase_add_test(TCase_lcp_optflags_asyncmap, tc_lcp_optflags_asyncmap);
+    suite_add_tcase(s, TCase_lcp_optflags_asyncmap);
     tcase_add_test(TCase_lcp_send_configure_ack, tc_lcp_send_configure_ack);
     suite_add_tcase(s, TCase_lcp_send_configure_ack);
     tcase_add_test(TCase_lcp_send_terminate_request, tc_lcp_send_terminate_request);

@@ -74,6 +74,7 @@
 #define PICO_CONF_DISCARD_REQ 11
 
 #define LCPOPT_MRU          1u /* param size: 4, fixed: MRU     */
+#define LCPOPT_ASYNCMAP		2u /* param size: 6, fixed: Async map */
 #define LCPOPT_AUTH         3u /* param size: 4-5: AUTH proto   */
 #define LCPOPT_QUALITY      4u /* unused for now                */
 #define LCPOPT_MAGIC        5u /* param size: 6, fixed: Magic   */
@@ -108,7 +109,7 @@
 #define IPCP_OPT_NBNS2 0x84
 
 static uint8_t LCPOPT_LEN[9] = {
-    0, 4, 0, 4, 4, 6, 2, 2, 2
+    0, 4, 6, 4, 4, 6, 2, 2, 2
 };
 
 
@@ -300,6 +301,7 @@ struct pico_device_ppp {
     uint8_t frame_id;
     uint8_t timer_on;
     uint16_t mru;
+    uint32_t asyncmap;
 };
 
 
@@ -320,8 +322,10 @@ static void lcp_optflags_print(struct pico_device_ppp *ppp, uint8_t *opts, uint3
 #define PPP_TIMER_ON_AUTH       0x10u
 #define PPP_TIMER_ON_IPCP       0x20u
 
-static int should_escape(uint8_t byte) {
-  return (byte == PPPF_FLAG_SEQ || byte == PPPF_CTRL_ESC || byte == PPPF_CTRL || byte < 0x20);
+static int should_escape(struct pico_device_ppp* ppp, uint8_t byte) {
+    // TODO: use ppp->asyncmap
+    IGNORE_PARAMETER(ppp);
+    return (byte == PPPF_FLAG_SEQ || byte == PPPF_CTRL_ESC || byte == PPPF_CTRL || byte < 0x20);
 }
 
 /* Escape and send */
@@ -348,7 +352,7 @@ static int ppp_serial_send_escape(struct pico_device_ppp *ppp, void *buf, int le
 
     for (i = 1; i < (len - 1); i++) /* from 1 to len -1, as start/stop are not escaped */
     {
-        if (should_escape(in_buf[i]))
+        if (should_escape(ppp, in_buf[i]))
             esc_char_count++;
     }
     if (!esc_char_count) {
@@ -363,7 +367,7 @@ static int ppp_serial_send_escape(struct pico_device_ppp *ppp, void *buf, int le
     /* Start byte. */
     out_buf[0] = in_buf[0];
     for(i = 1, j = 1; i < (len - 1); i++) {
-        if (should_escape(in_buf[i])) {
+        if (should_escape(ppp, in_buf[i])) {
             out_buf[j++] = PPPF_CTRL_ESC;
             out_buf[j++] = in_buf[i] ^ 0x20;
         } else {
@@ -807,7 +811,7 @@ static void ppp_modem_recv(struct pico_device_ppp *ppp, void *data, uint32_t len
 
 static void lcp_send_configure_request(struct pico_device_ppp *ppp)
 {
-#   define MY_LCP_REQ_SIZE 12 /* Max value. */
+#   define MY_LCP_REQ_SIZE 18 /* Max value. */
     struct pico_lcp_hdr *req;
     uint8_t *lcpbuf, *opts;
     uint32_t size = MY_LCP_REQ_SIZE;
@@ -845,6 +849,15 @@ static void lcp_send_configure_request(struct pico_device_ppp *ppp)
     if (LCPOPT_ISSET_LOCAL(ppp, LCPOPT_ADDRCTL_COMP)) {
         opts[optsize++] = LCPOPT_ADDRCTL_COMP;
         opts[optsize++] = LCPOPT_LEN[LCPOPT_ADDRCTL_COMP];
+    }
+
+    if (LCPOPT_ISSET_LOCAL(ppp, LCPOPT_ASYNCMAP)) {
+        opts[optsize++] = LCPOPT_ASYNCMAP;
+        opts[optsize++] = LCPOPT_LEN[LCPOPT_ASYNCMAP];
+        opts[optsize++] = 0;
+        opts[optsize++] = 0;
+        opts[optsize++] = 0;
+        opts[optsize++] = 0;
     }
 
     req->len = short_be((uint16_t)((unsigned long)optsize + sizeof(struct pico_lcp_hdr)));
@@ -898,6 +911,10 @@ static uint16_t lcp_optflags(struct pico_device_ppp *ppp, uint8_t *pkt, uint32_t
     uint16_t flags = 0;
     uint8_t *p = pkt +  sizeof(struct pico_lcp_hdr);
     int off;
+
+    if (adjust_opts)
+        ppp->asyncmap = 0xffffffff;
+
     while(p < (pkt + len)) {
         flags = (uint16_t)((uint16_t)(1u << (uint16_t)p[0]) | flags);
 
@@ -913,6 +930,10 @@ static uint16_t lcp_optflags(struct pico_device_ppp *ppp, uint8_t *pkt, uint32_t
             case LCPOPT_AUTH:
                 ppp_dbg("Setting AUTH to %02x%02x\n", p[2], p[3]);
                 ppp->auth = (uint16_t)((p[2] << 8) + p[3]);
+                break;
+            case LCPOPT_ASYNCMAP:
+                ppp->asyncmap = ((uint32_t)p[2] << 24) | ((uint32_t)p[3] << 16) | ((uint32_t)p[4] << 8) | p[5];
+                ppp_dbg("Setting Async-Control-Character-Map to %08x\n", ppp->asyncmap);
                 break;
             default:
                 break;
@@ -2234,7 +2255,7 @@ struct pico_device *pico_ppp_create(struct pico_stack *S)
     LCPOPT_SET_LOCAL(ppp, LCPOPT_AUTH); /* We support authentication, even if it's not part of the req */
     LCPOPT_SET_LOCAL(ppp, LCPOPT_PROTO_COMP);
     LCPOPT_SET_LOCAL(ppp, LCPOPT_ADDRCTL_COMP);
-
+    LCPOPT_SET_LOCAL(ppp, LCPOPT_ASYNCMAP);
 
     ppp_dbg("Device %s created.\n", ppp->dev.name);
     return (struct pico_device *)ppp;
