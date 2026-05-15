@@ -449,7 +449,35 @@ START_TEST(tc_tcp_rcv_sack)
 END_TEST
 START_TEST(tc_tcp_parse_options)
 {
-    /* TODO: test this: static void tcp_parse_options(struct pico_frame *f) */
+    struct pico_stack *S = NULL;
+    struct pico_socket_tcp *t = NULL;
+    struct pico_frame *f = NULL;
+    struct pico_tcp_hdr *hdr = NULL;
+    uint8_t *opt = NULL;
+
+    pico_stack_init(&S);
+    t = (struct pico_socket_tcp *)pico_tcp_open(S, PICO_PROTO_IPV4);
+    fail_if(!t);
+
+    f = pico_frame_alloc(64);
+    fail_if(!f);
+    f->sock = &t->sock;
+    f->transport_hdr = f->start;
+    f->transport_len = 24; /* 20-byte header + 4 bytes options */
+    hdr = (struct pico_tcp_hdr *)f->transport_hdr;
+    hdr->len = 0x60u;
+    opt = f->transport_hdr + PICO_SIZE_TCPHDR;
+
+    /* Malformed option: MSS with invalid option length < 2 */
+    opt[0] = PICO_TCP_OPTION_MSS;
+    opt[1] = 1u;
+    fail_unless(tcp_parse_options(f) < 0);
+
+    /* Valid option sequence: NOOP + END */
+    memset(opt, 0, 4u);
+    opt[0] = PICO_TCP_OPTION_NOOP;
+    opt[1] = PICO_TCP_OPTION_END;
+    fail_unless(tcp_parse_options(f) == 0);
 }
 END_TEST
 START_TEST(tc_tcp_send)
@@ -499,7 +527,27 @@ START_TEST(tc_tcp_sack_prepare)
 END_TEST
 START_TEST(tc_tcp_data_in)
 {
-    /* TODO: test this: static int tcp_data_in(struct pico_socket *s, struct pico_frame *f) */
+    struct pico_stack *S = NULL;
+    struct pico_socket_tcp *t = NULL;
+    struct pico_frame *f = NULL;
+    struct pico_tcp_hdr *hdr = NULL;
+
+    pico_stack_init(&S);
+    t = (struct pico_socket_tcp *)pico_tcp_open(S, PICO_PROTO_IPV4);
+    fail_if(!t);
+
+    f = pico_frame_alloc(64);
+    fail_if(!f);
+    f->sock = &t->sock;
+    f->transport_hdr = f->start;
+    f->transport_len = 20;
+    hdr = (struct pico_tcp_hdr *)f->transport_hdr;
+
+    hdr->len = 0x40u; /* invalid (< 20 bytes) */
+    fail_unless(tcp_data_in(&t->sock, f) < 0);
+
+    hdr->len = 0x60u; /* 24 bytes > transport_len */
+    fail_unless(tcp_data_in(&t->sock, f) < 0);
 }
 END_TEST
 START_TEST(tc_tcp_ack_advance_una)

@@ -175,6 +175,9 @@ pico_dns_namelen_comp( char *name );
 char *
 pico_dns_decompress_name( char *name, pico_dns_packet *packet );
 
+char *
+pico_dns_decompress_name_len( char *name, pico_dns_packet *packet, uint16_t packet_len );
+
 /* ****************************************************************************
  *  Converts a DNS name in DNS name format to a name in URL format. Provides
  *  space for the name in URL format as well. PICO_FREE() should be called on

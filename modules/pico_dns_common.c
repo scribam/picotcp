@@ -110,67 +110,99 @@ pico_dns_namelen_comp( char *name )
  *  @return Returns the decompressed name, NULL on failure.
  * ****************************************************************************/
 char *
-pico_dns_decompress_name( char *name, pico_dns_packet *packet )
+pico_dns_decompress_name_len( char *name, pico_dns_packet *packet, uint16_t packet_len )
 {
-    char decompressed_name[PICO_DNS_NAMEBUF_SIZE] = {
-        0
-    };
+    char decompressed_name[PICO_DNS_NAMEBUF_SIZE] = { 0 };
+    uint16_t visited_offsets[PICO_DNS_NAMEBUF_SIZE] = { 0 };
     char *return_name = NULL;
-    uint16_t ptr = 0, nslen = 0;
-    uint16_t decompressed_index = 0;
-    char *label = NULL, *next = NULL;
+    uint8_t *packet_start = (uint8_t *)packet;
+    uint8_t *packet_end = NULL;
+    uint8_t *label = (uint8_t *)name;
+    uint16_t decompressed_index = 0u;
+    uint16_t visited_count = 0u;
+    uint16_t iteration = 0u;
+    uint16_t nslen = 0u;
 
-    /* Reading labels until reaching to pointer or NULL terminator.
-     * Only one pointer is allowed in DNS compression, the pointer is always the last according to the RFC */
-    dns_name_foreach_label_safe(label, name, next, PICO_DNS_NAMEBUF_SIZE) {
+    if (!name || !packet || (packet_len < sizeof(struct pico_dns_header))) {
+        pico_err = PICO_ERR_EINVAL;
+        return NULL;
+    }
 
-        uint8_t label_size = (uint8_t)(*label+1);
-        if (decompressed_index + label_size >= PICO_DNS_NAMEBUF_SIZE) {
+    packet_end = packet_start + packet_len;
+    if ((label < packet_start) || (label >= packet_end)) {
+        pico_err = PICO_ERR_EINVAL;
+        return NULL;
+    }
+
+    while (1) {
+        uint8_t label_len = 0u;
+
+        if ((label < packet_start) || (label >= packet_end) || (++iteration > PICO_DNS_NAMEBUF_SIZE)) {
             return NULL;
         }
-        memcpy(&decompressed_name[decompressed_index], label, label_size);
-        decompressed_index = (uint16_t)(decompressed_index+label_size);
-    }
 
-    if (decompressed_index >= PICO_DNS_NAMEBUF_SIZE) {
-        return NULL;
-    }
-
-    if (*label & 0xC0) {
-        /* Found compression bits */
-        ptr = (uint16_t)((((uint16_t) *label) & 0x003F) << 8);
-        ptr = (uint16_t)(ptr | (uint16_t) *(label + 1));
-        label = (char *)((uint8_t *)packet + ptr);
-
-        dns_name_foreach_label_safe(label, label, next, PICO_DNS_NAMEBUF_SIZE-decompressed_index) {
-            uint8_t label_size = (uint8_t)(*label + 1);
-            if (decompressed_index + label_size >= PICO_DNS_NAMEBUF_SIZE) {
+        label_len = *label;
+        if ((label_len & 0xC0u) == 0xC0u) {
+            uint16_t ptr = 0u;
+            uint16_t i = 0u;
+            if ((label + 1u) >= packet_end) {
                 return NULL;
             }
-            memcpy(&decompressed_name[decompressed_index], label, label_size);
-            decompressed_index = (uint16_t) (decompressed_index + label_size);
+            ptr = (uint16_t)(((uint16_t)(label_len & 0x3Fu) << 8) | (uint16_t) *(label + 1u));
+            if (ptr >= packet_len) {
+                return NULL;
+            }
+            for (i = 0u; i < visited_count; i++) {
+                if (visited_offsets[i] == ptr) {
+                    return NULL;
+                }
+            }
+            if (visited_count >= PICO_DNS_NAMEBUF_SIZE) {
+                return NULL;
+            }
+            visited_offsets[visited_count++] = ptr;
+            label = packet_start + ptr;
+            continue;
         }
+
+        if (label_len & 0xC0u) {
+            return NULL;
+        }
+
+        if (label_len == 0u) {
+            break;
+        }
+
+        if ((label_len > 63u) || ((label + 1u + label_len) > packet_end)) {
+            return NULL;
+        }
+
+        if ((uint16_t)(decompressed_index + (uint16_t)label_len + 1u) >= PICO_DNS_NAMEBUF_SIZE) {
+            return NULL;
+        }
+
+        decompressed_name[decompressed_index++] = (char)label_len;
+        memcpy(&decompressed_name[decompressed_index], label + 1u, label_len);
+        decompressed_index = (uint16_t)(decompressed_index + label_len);
+        label = label + label_len + 1u;
     }
 
-    if (decompressed_index >= PICO_DNS_NAMEBUF_SIZE) {
-        return NULL;
-    }
-
-    /* Append final zero-byte */
-    decompressed_name[decompressed_index] = (uint8_t) '\0';
-
-    /* Provide storage for the name to return */
-    nslen = (uint16_t)(pico_dns_strlen(decompressed_name) + 1);
-    if(!(return_name = PICO_ZALLOC((size_t)nslen))) {
+    decompressed_name[decompressed_index] = '\0';
+    nslen = (uint16_t)(decompressed_index + 1u);
+    if (!(return_name = PICO_ZALLOC((size_t)nslen))) {
         pico_err = PICO_ERR_ENOMEM;
         return NULL;
     }
 
-    memcpy((void *)return_name, (void *)decompressed_name, (size_t)nslen);
-
+    memcpy(return_name, decompressed_name, (size_t)nslen);
     return return_name;
 }
 
+char *
+pico_dns_decompress_name( char *name, pico_dns_packet *packet )
+{
+    return pico_dns_decompress_name_len(name, packet, PICO_IP_MRU);
+}
 /* ****************************************************************************
  *  Determines the length of a given url as if it where a DNS name in reverse
  *  resolution format.

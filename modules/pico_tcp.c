@@ -868,9 +868,6 @@ static inline void tcp_parse_option_mss(struct pico_socket_tcp *t, uint8_t len, 
     if (tcpopt_len_check(idx, len, PICO_TCPOPTLEN_MSS) < 0)
         return;
 
-    if ((*idx + PICO_TCPOPTLEN_MSS - 2) > len)
-        return;
-
     t->mss_ok = 1;
     mss = short_from(opt + *idx);
     *idx += (uint32_t)sizeof(uint16_t);
@@ -896,33 +893,40 @@ static inline void tcp_parse_option_timestamp(struct pico_socket_tcp *t, struct 
 static int tcp_parse_options(struct pico_frame *f)
 {
     struct pico_socket_tcp *t = (struct pico_socket_tcp *)f->sock;
+    struct pico_tcp_hdr *hdr = (struct pico_tcp_hdr *)f->transport_hdr;
     uint8_t *opt = f->transport_hdr + PICO_SIZE_TCPHDR;
+    uint16_t hdr_len = (uint16_t)((hdr->len & 0xf0u) >> 2u);
+    uint16_t options_len = 0u;
     uint32_t i = 0;
     f->timestamp = 0;
 
-    if (f->transport_hdr + f->transport_len > f->buffer + f->buffer_len)
+    if ((f->transport_hdr + f->transport_len > f->buffer + f->buffer_len) ||
+        (hdr_len < PICO_SIZE_TCPHDR) || (hdr_len > f->transport_len))
         return -1;
 
-    while (i < (f->transport_len - PICO_SIZE_TCPHDR)) {
+    options_len = (uint16_t)(hdr_len - PICO_SIZE_TCPHDR);
+    while (i < options_len) {
         uint8_t type =  opt[i++];
         uint8_t len;
-        if(i < (f->transport_len - PICO_SIZE_TCPHDR) && (type > 1))
+        if ((i < options_len) && (type > 1u))
             len =  opt[i++];
         else
             len = 1;
 
-        if (f->payload && ((opt + i) > f->payload))
-            break;
+        if (len == 0u) {
+            return -1;
+        }
 
-        if (len == 0) {
+        if ((type > 1u) && (((uint32_t)len < 2u) || ((uint32_t)(len - 2u) > (uint32_t)(options_len - i)))) {
             return -1;
         }
 
         tcp_dbg_options("Received option '%d', len = %d \n", type, len);
         switch (type) {
         case PICO_TCP_OPTION_NOOP:
-        case PICO_TCP_OPTION_END:
             break;
+        case PICO_TCP_OPTION_END:
+            return 0;
         case PICO_TCP_OPTION_WS:
             tcp_parse_option_ws(t, len, opt, &i);
             break;
@@ -1771,14 +1775,16 @@ static int tcp_data_in(struct pico_socket *s, struct pico_frame *f)
 {
     struct pico_socket_tcp *t = (struct pico_socket_tcp *)s;
     struct pico_tcp_hdr *hdr = (struct pico_tcp_hdr *) f->transport_hdr;
-    uint16_t payload_len = (uint16_t)(f->transport_len - ((hdr->len & 0xf0u) >> 2u));
+    uint16_t hdr_len = (uint16_t)((hdr->len & 0xf0u) >> 2u);
+    uint16_t payload_len = 0u;
     int ret = 0;
     (void)hdr;
 
-    if (((hdr->len & 0xf0u) >> 2u) <= f->transport_len) {
+    if ((hdr_len >= PICO_SIZE_TCPHDR) && (hdr_len <= f->transport_len)) {
+        payload_len = (uint16_t)(f->transport_len - hdr_len);
         if (tcp_parse_options(f) < 0)
             return -1;
-        f->payload = f->transport_hdr + ((hdr->len & 0xf0u) >> 2u);
+        f->payload = f->transport_hdr + hdr_len;
         f->payload_len = payload_len;
         tcp_dbg("TCP> Received segment. (exp: %x got: %x)\n", t->rcv_nxt, SEQN(f));
 
@@ -2874,12 +2880,26 @@ static int tcp_action_by_flags(const struct tcp_action_entry *action, struct pic
 int pico_tcp_input(struct pico_socket *s, struct pico_frame *f)
 {
     struct pico_tcp_hdr *hdr = (struct pico_tcp_hdr *) (f->transport_hdr);
+    uint16_t hdr_len = (uint16_t)((hdr->len & 0xf0u) >> 2u);
     int ret = 0;
     uint8_t flags = hdr->flags;
     const struct tcp_action_entry *action = &tcp_fsm[s->state >> 8];
 
-    f->payload = (f->transport_hdr + ((hdr->len & 0xf0u) >> 2u));
-    f->payload_len = (uint16_t)(f->transport_len - ((hdr->len & 0xf0u) >> 2u));
+    if ((f->transport_hdr + f->transport_len) > (f->buffer + f->buffer_len)) {
+        tcp_dbg("TCP> Invalid transport len %04x\n", f->transport_len);
+        pico_frame_discard(f);
+        return -1;
+    }
+
+    if ((hdr_len < PICO_SIZE_TCPHDR) || (hdr_len > f->transport_len) ||
+        ((f->transport_hdr + hdr_len) > (f->buffer + f->buffer_len))) {
+        tcp_dbg("TCP> Invalid tcp header len %04x\n", hdr_len);
+        pico_frame_discard(f);
+        return -1;
+    }
+
+    f->payload = (f->transport_hdr + hdr_len);
+    f->payload_len = (uint16_t)(f->transport_len - hdr_len);
 
     tcp_dbg("[sam] TCP> [tcp input] t_len: %u\n", f->transport_len);
     tcp_dbg("[sam] TCP> flags = 0x%02x\n", hdr->flags);

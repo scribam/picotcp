@@ -1070,6 +1070,34 @@ START_TEST(tc_pico_dns_decompress_name) /* MARK: dns_decompress_name */
     printf("*********************** ending %s * \n", __func__);
 }
 END_TEST
+
+START_TEST(tc_pico_dns_decompress_name_invalid)
+{
+    uint8_t loop_buf[32] = {
+        0
+    };
+    uint8_t trunc_buf[32] = {
+        0
+    };
+    char *ret = NULL;
+
+    printf("*********************** starting %s * \n", __func__);
+
+    loop_buf[0] = 0xc0u;
+    loop_buf[1] = 0x00u; /* pointer to itself */
+    ret = pico_dns_decompress_name_len((char *)loop_buf, (pico_dns_packet *)loop_buf, sizeof(loop_buf));
+    fail_unless(ret == NULL, "Self-referencing compression pointer should fail");
+
+    trunc_buf[0] = 0x03u;
+    trunc_buf[1] = 'w';
+    trunc_buf[2] = 'w';
+    /* missing one byte and terminator */
+    ret = pico_dns_decompress_name_len((char *)trunc_buf, (pico_dns_packet *)trunc_buf, 3u);
+    fail_unless(ret == NULL, "Truncated DNS label should fail");
+
+    printf("*********************** ending %s * \n", __func__);
+}
+END_TEST
 START_TEST(tc_pico_dns_url_get_reverse_len) /* MARK: dns_url_get_reverse_len */
 {
     const char *url_ipv4 = "10.10.0.1";
@@ -1415,6 +1443,7 @@ Suite *pico_suite(void)
     tcase_add_test(TCase_pico_dns_answer_create, tc_pico_dns_answer_create);
     tcase_add_test(TCase_pico_dns_namelen_comp, tc_pico_dns_namelen_comp);
     tcase_add_test(TCase_pico_dns_decompress_name, tc_pico_dns_decompress_name);
+    tcase_add_test(TCase_pico_dns_decompress_name, tc_pico_dns_decompress_name_invalid);
     tcase_add_test(TCase_pico_dns_url_get_reverse_len, tc_pico_dns_url_get_reverse_len);
     tcase_add_test(TCase_pico_dns_url_to_reverse_qname, tc_pico_dns_url_to_reverse_qname);
     tcase_add_test(TCase_pico_dns_qname_to_url, tc_pico_dns_qname_to_url);
@@ -1474,4 +1503,3 @@ int main(void)
     srunner_free(sr);
     return fails;
 }
-

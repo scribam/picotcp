@@ -210,8 +210,23 @@ static int pico_icmp6_send_echoreply(struct pico_frame *echo)
 
 static void pico_icmp6_ping_echo_recv_request(struct pico_frame *f)
 {
+    struct pico_icmp6_hdr *hdr = NULL;
     icmp6_dbg("ICMP6: Received ECHO REQ\n");
-    f->transport_len = (uint16_t)(f->len - f->net_len - (uint16_t)(f->net_hdr - f->buffer));
+    if (!f || !f->transport_hdr)
+        return;
+
+    if ((f->transport_len < PICO_ICMP6HDR_ECHO_REQUEST_SIZE) ||
+        ((f->transport_hdr + f->transport_len) > (f->buffer + f->buffer_len))) {
+        pico_frame_discard(f);
+        return;
+    }
+
+    hdr = (struct pico_icmp6_hdr *)f->transport_hdr;
+    if (hdr->type != PICO_ICMP6_ECHO_REQUEST || pico_icmp6_checksum(f) != 0) {
+        pico_frame_discard(f);
+        return;
+    }
+
     pico_icmp6_send_echoreply(f);
     pico_frame_discard(f);
 }
