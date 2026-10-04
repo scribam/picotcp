@@ -15,7 +15,7 @@ jobs:
       - name: Set up build environment (Linux)
         run: |
           sudo apt-get update
-          sudo apt-get install check
+          sudo apt-get install check libvdeplug-dev
         if: runner.os == 'Linux'
       - name: Set up build environment (macOS)
         run: |
@@ -30,3 +30,8 @@ jobs:
           make clean
           make units UNITS=1
           ./test/units.sh
+      - name: Test
+        run: |
+          make clean
+          make test TEST=1
+          ./test/autotest.sh
